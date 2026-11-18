@@ -1,0 +1,580 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MONSTER SURVIVE - BOSS EDITION</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#050510;color:white;
+ font-family:Arial;text-align:center;
+}
+h1{
+ color:#d94cff;font-size:38px;
+ text-shadow:0 0 15px #d94cff,0 0 35px purple;
+}
+button{
+ display:block;width:270px;max-width:90%;
+ margin:13px auto;padding:17px;
+ border:0;border-radius:12px;color:white;
+ font-size:17px;font-weight:bold;cursor:pointer;
+}
+button:hover{transform:scale(1.06);filter:brightness(1.3)}
+.easy{background:linear-gradient(90deg,#087b43,#30e98a)}
+.mid{background:linear-gradient(90deg,#bd7100,#ffc13c)}
+.hard{background:linear-gradient(90deg,#a60042,#ff246b)}
+#game{
+ display:none;position:relative;overflow:hidden;
+ width:600px;max-width:96vw;height:440px;
+ margin:15px auto;border:2px solid cyan;
+ border-radius:18px;
+ background:radial-gradient(ellipse at bottom,#22265b,#080b1c 70%,#03040b);
+ box-shadow:0 0 35px #42f5ff55;
+}
+#monster{
+ position:absolute;bottom:22px;left:50%;
+ width:42px;height:39px;
+ transform:translateX(-50%);
+ background:linear-gradient(135deg,#ed78ff,#8c20d9);
+ border-radius:45% 45% 38% 38%;
+ box-shadow:0 0 18px #d94cff;
+ z-index:5;
+ animation:bounce .35s infinite alternate;
+}
+#monster:before{
+ content:"";position:absolute;top:10px;left:9px;
+ width:7px;height:9px;background:white;
+ border-radius:50%;box-shadow:17px 0 white,0 0 9px cyan;
+}
+#monster:after{
+ content:"";position:absolute;top:25px;left:15px;
+ width:12px;height:5px;border-bottom:2px solid white;
+ border-radius:50%;
+}
+@keyframes bounce{
+ to{transform:translateX(-50%) translateY(-5px)}
+}
+.enemy{
+ position:absolute;width:27px;height:27px;
+ background:#ff286c;transform:rotate(45deg);
+ box-shadow:0 0 20px #ff286c;z-index:2;
+}
+.crystal{
+ position:absolute;width:17px;height:17px;
+ background:cyan;transform:rotate(45deg);
+ box-shadow:0 0 20px cyan;z-index:3;
+}
+.laser{
+ position:absolute;width:12px;border-radius:10px;
+ background:linear-gradient(90deg,#ff003c,#fff,#ff003c);
+ box-shadow:0 0 8px red,0 0 20px #ff003c,0 0 40px red;
+ z-index:4;
+ animation:laserGlow .15s infinite alternate;
+}
+@keyframes laserGlow{
+ to{box-shadow:0 0 15px white,0 0 35px red,0 0 55px #ff003c}
+}
+#boss{
+ display:none;
+ position:absolute;
+ width:112px;height:78px;
+ top:28px;left:50%;
+ transform:translateX(-50%);
+ z-index:6;
+ border:3px solid #ff315f;
+ border-radius:45% 45% 35% 35%;
+ background:radial-gradient(circle at 50% 30%,#ff526c,#79001e 70%);
+ box-shadow:0 0 20px red,0 0 45px #ff003c;
+ font-size:53px;line-height:70px;
+ animation:bossFloat .6s infinite alternate;
+}
+@keyframes bossFloat{
+ to{transform:translateX(-50%) translateY(8px) scale(1.04)}
+}
+#bossBar{
+ display:none;
+ width:80%;max-width:420px;
+ margin:8px auto;
+ height:18px;border:2px solid white;
+ border-radius:20px;overflow:hidden;
+ background:#333;
+}
+#bossHealth{
+ width:100%;height:100%;
+ background:linear-gradient(90deg,#ff003c,#ff7b24);
+ transition:width .15s;
+}
+.playerShot{
+ position:absolute;width:7px;height:18px;
+ border-radius:8px;background:#54ffff;
+ box-shadow:0 0 10px cyan,0 0 20px cyan;
+ z-index:4;
+}
+.bossShot{
+ position:absolute;width:17px;height:17px;
+ border-radius:50%;background:#ff174f;
+ box-shadow:0 0 12px red,0 0 25px #ff003c;
+ z-index:4;
+}
+#stats{display:none;font-size:19px;margin:12px}
+#message{color:cyan;font-size:20px;min-height:25px}
+#back{display:none;background:#29234c}
+</style>
+</head>
+<body>
+
+<h1>👾 MONSTER SURVIVE</h1>
+<p>⚡ LASER + BOSS EDITION ⚡</p>
+
+<div id="menu">
+<h2>WÄHLE DEIN LEVEL</h2>
+<button class="easy" onclick="start(5,'EASY')">
+🟢 LEVEL 1 – EASY<br>GESCHWINDIGKEIT 5
+</button>
+<button class="mid" onclick="start(7.5,'MID')">
+🟡 LEVEL 2 – MID<br>GESCHWINDIGKEIT 7,5
+</button>
+<button class="hard" onclick="start(10,'HARD')">
+🔴 LEVEL 3 – HARD<br>GESCHWINDIGKEIT 10
+</button>
+</div>
+
+<div id="stats">
+❤️ Leben: <span id="lives">3</span>
+&nbsp; | &nbsp; ⭐ Punkte: <span id="score">0</span>
+</div>
+
+<div id="bossBar">
+ <div id="bossHealth"></div>
+</div>
+
+<div id="message"></div>
+
+<div id="game">
+ <div id="monster"></div>
+ <div id="boss">👹</div>
+</div>
+
+<button id="back" onclick="backToMenu()">ZURÜCK ZUM MENÜ</button>
+<p>Steuerung: ← → oder A / D</p>
+
+<script>
+const game=document.getElementById("game");
+const monster=document.getElementById("monster");
+const boss=document.getElementById("boss");
+
+let x=50,lives=3,score=0,speed=5;
+let active=false,enemies=[],keys={};
+let playerShots=[],bossShots=[];
+let animation,spawnTimer=0,crystalTimer=0;
+let laserTimer=0,lastTime=0;
+let audioCtx=null;
+
+let survivalTime=0;
+let bossActive=false;
+let bossDefeated=false;
+let bossHP=20;
+let bossShootTimer=0;
+let playerShootTimer=0;
+let bossPosition=50;
+let bossDirection=1;
+
+function setupAudio(){
+ if(!audioCtx){
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ }
+ if(audioCtx.state==="suspended")audioCtx.resume();
+}
+
+function playTone(freq,duration,type="sawtooth",volume=0.2){
+ if(!audioCtx)return;
+ const o=audioCtx.createOscillator();
+ const g=audioCtx.createGain();
+ o.type=type;
+ o.frequency.setValueAtTime(freq,audioCtx.currentTime);
+ g.gain.setValueAtTime(volume,audioCtx.currentTime);
+ g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+duration);
+ o.connect(g);g.connect(audioCtx.destination);
+ o.start();o.stop(audioCtx.currentTime+duration);
+}
+
+function monsterScream(){
+ if(!audioCtx)return;
+ const now=audioCtx.currentTime;
+
+ const master=audioCtx.createGain();
+ master.gain.setValueAtTime(0.0001,now);
+ master.gain.linearRampToValueAtTime(0.8,now+0.04);
+ master.gain.exponentialRampToValueAtTime(0.0001,now+1.5);
+
+ const distortion=ctxDistortion();
+ const echo=audioCtx.createDelay(.5);
+ echo.delayTime.value=.18;
+ const echoGain=audioCtx.createGain();
+ echoGain.gain.value=.25;
+
+ const filter=audioCtx.createBiquadFilter();
+ filter.type="lowpass";
+ filter.frequency.value=900;
+
+ master.connect(distortion);
+ distortion.connect(filter);
+ filter.connect(audioCtx.destination);
+ filter.connect(echo);
+ echo.connect(echoGain);
+ echoGain.connect(audioCtx.destination);
+
+ const growl=audioCtx.createOscillator();
+ const growlGain=audioCtx.createGain();
+ growl.type="sawtooth";
+ growl.frequency.setValueAtTime(95,now);
+ growl.frequency.exponentialRampToValueAtTime(48,now+.5);
+ growlGain.gain.setValueAtTime(.7,now);
+ growlGain.gain.exponentialRampToValueAtTime(.001,now+1.2);
+ growl.connect(growlGain);
+ growlGain.connect(master);
+ growl.start(now);
+ growl.stop(now+1.3);
+
+ const scream=audioCtx.createOscillator();
+ const screamGain=audioCtx.createGain();
+ scream.type="sawtooth";
+ scream.frequency.setValueAtTime(170,now+.1);
+ scream.frequency.exponentialRampToValueAtTime(300,now+.5);
+ scream.frequency.exponentialRampToValueAtTime(140,now+1.2);
+ screamGain.gain.setValueAtTime(.001,now);
+ screamGain.gain.linearRampToValueAtTime(.7,now+.2);
+ screamGain.gain.exponentialRampToValueAtTime(.001,now+1.4);
+ scream.connect(screamGain);
+ screamGain.connect(master);
+ scream.start(now+.1);
+ scream.stop(now+1.5);
+}
+
+function ctxDistortion(){
+ const d=audioCtx.createWaveShaper();
+ const curve=new Float32Array(44100);
+ for(let i=0;i<curve.length;i++){
+  let v=i*2/curve.length-1;
+  curve[i]=Math.tanh(v*7);
+ }
+ d.curve=curve;
+ d.oversample="4x";
+ return d;
+}
+
+function bossRoar(){
+ if(!audioCtx)return;
+ playTone(65,1.1,"sawtooth",.6);
+ setTimeout(()=>playTone(90,.8,"square",.25),180);
+}
+
+document.addEventListener("keydown",e=>{
+ keys[e.key]=true;
+ if(["ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
+});
+document.addEventListener("keyup",e=>keys[e.key]=false);
+
+function start(s,level){
+ setupAudio();
+ cancelAnimationFrame(animation);
+
+ clearObjects();
+ speed=s;x=50;lives=3;score=0;
+ spawnTimer=0;crystalTimer=0;laserTimer=0;
+ lastTime=0;active=true;
+ survivalTime=0;
+ bossActive=false;bossDefeated=false;
+ bossHP=20;bossShootTimer=0;playerShootTimer=0;
+ bossPosition=50;bossDirection=1;
+
+ boss.style.display="none";
+ document.getElementById("bossBar").style.display="none";
+ document.getElementById("bossHealth").style.width="100%";
+ document.getElementById("menu").style.display="none";
+ document.getElementById("stats").style.display="block";
+ document.getElementById("back").style.display="block";
+ document.getElementById("back").textContent="ZURÜCK ZUM MENÜ";
+ document.getElementById("message").textContent=
+ "LEVEL "+level+" – ÜBERLEBE 60 SEKUNDEN!";
+ document.getElementById("lives").textContent=3;
+ document.getElementById("score").textContent=0;
+ game.style.display="block";
+ game.style.borderColor="cyan";
+ monster.style.left="50%";
+
+ animation=requestAnimationFrame(loop);
+}
+
+function clearObjects(){
+ enemies.forEach(e=>e.el.remove());
+ playerShots.forEach(e=>e.el.remove());
+ bossShots.forEach(e=>e.el.remove());
+ enemies=[];playerShots=[];bossShots=[];
+}
+
+function spawn(type){
+ let el=document.createElement("div");
+ el.className=type;
+ let pos=5+Math.random()*90;
+ el.style.left=pos+"%";
+ el.style.top="-30px";
+ game.appendChild(el);
+ enemies.push({el,y:-30,type});
+}
+
+function spawnLaser(){
+ let el=document.createElement("div");
+ el.className="laser";
+ let pos=5+Math.random()*88;
+ let height=100+Math.random()*150;
+ el.style.left=pos+"%";
+ el.style.top="-"+height+"px";
+ el.style.height=height+"px";
+ game.appendChild(el);
+ enemies.push({el,y:-height,type:"laser",height});
+}
+
+function collision(a,b){
+ let A=a.getBoundingClientRect(),B=b.getBoundingClientRect();
+ return A.left<B.right&&A.right>B.left&&
+ A.top<B.bottom&&A.bottom>B.top;
+}
+
+function loseLife(){
+ lives--;
+ document.getElementById("lives").textContent=lives;
+ monsterScream();
+
+ game.style.filter="brightness(2)";
+ setTimeout(()=>game.style.filter="",120);
+
+ if(lives<=0){
+  active=false;
+  document.getElementById("message").textContent=
+  "💀 GAME OVER! Punkte: "+score;
+  document.getElementById("back").textContent="NEUES SPIEL";
+ }
+}
+
+function startBoss(){
+ bossActive=true;
+ bossHP=20;
+ bossShootTimer=0;
+ playerShootTimer=0;
+ bossPosition=50;
+ boss.style.left="50%";
+ boss.style.display="block";
+
+ document.getElementById("bossBar").style.display="block";
+ document.getElementById("bossHealth").style.width="100%";
+ document.getElementById("message").textContent=
+ "🚨 BOSS ALARM! BESIEGE DAS MONSTER!";
+ game.style.borderColor="red";
+ bossRoar();
+}
+
+function damageBoss(){
+ bossHP--;
+ document.getElementById("bossHealth").style.width=
+ (bossHP/20*100)+"%";
+ score+=25;
+ document.getElementById("score").textContent=score;
+
+ playTone(240,.12,"square",.12);
+ boss.style.filter="brightness(2)";
+ setTimeout(()=>boss.style.filter="",90);
+
+ if(bossHP<=0){
+  bossActive=false;
+  bossDefeated=true;
+  boss.style.display="none";
+  document.getElementById("bossBar").style.display="none";
+  score+=1000;
+  document.getElementById("score").textContent=score;
+  document.getElementById("message").textContent=
+  "🏆 BOSS BESIEGT! +1000 PUNKTE! DU BIST DER KING!";
+  game.style.borderColor="gold";
+  playTone(500,.25,"sine",.3);
+  setTimeout(()=>playTone(700,.35,"sine",.3),220);
+  setTimeout(()=>playTone(900,.5,"sine",.3),450);
+  bossShots.forEach(s=>s.el.remove());
+  bossShots=[];
+  playerShots.forEach(s=>s.el.remove());
+  playerShots=[];
+ }
+}
+
+function firePlayerShot(){
+ let el=document.createElement("div");
+ el.className="playerShot";
+ let left=x;
+ el.style.left=left+"%";
+ el.style.top=(game.clientHeight-75)+"px";
+ game.appendChild(el);
+ playerShots.push({el,y:game.clientHeight-75});
+}
+
+function fireBossShot(){
+ let el=document.createElement("div");
+ el.className="bossShot";
+ let left=bossPosition;
+ el.style.left=left+"%";
+ el.style.top="105px";
+ game.appendChild(el);
+ bossShots.push({el,y:105,x:left});
+ playTone(120,.12,"square",.08);
+}
+
+function loop(time){
+ if(!active)return;
+
+ const elapsed=lastTime?(time-lastTime)/1000:0;
+ const dt=Math.min(elapsed*60||1,2);
+ lastTime=time;
+ survivalTime+=elapsed;
+
+ if(keys.ArrowLeft||keys.a||keys.A)x-=2.5*dt;
+ if(keys.ArrowRight||keys.d||keys.D)x+=2.5*dt;
+ x=Math.max(4,Math.min(96,x));
+ monster.style.left=x+"%";
+
+ // Normale Gegner und Laser
+ spawnTimer+=dt;
+ crystalTimer+=dt;
+ laserTimer+=dt;
+
+ if(spawnTimer>42){spawn("enemy");spawnTimer=0}
+ if(crystalTimer>110){spawn("crystal");crystalTimer=0}
+
+ let laserDelay=speed===5?75:speed===7.5?45:28;
+ if(laserTimer>laserDelay){
+  spawnLaser();
+  if(speed>=7.5&&Math.random()<.25)spawnLaser();
+  if(speed>=10&&Math.random()<.35)spawnLaser();
+  laserTimer=0;
+ }
+
+ // Boss erscheint nach 60 Sekunden
+ if(survivalTime>=60&&!bossActive&&!bossDefeated){
+  startBoss();
+ }
+
+ // Boss bewegt sich und schießt
+ if(bossActive){
+  bossPosition+=bossDirection*(.6+speed*.035)*dt;
+  if(bossPosition>85){bossPosition=85;bossDirection=-1}
+  if(bossPosition<15){bossPosition=15;bossDirection=1}
+  boss.style.left=bossPosition+"%";
+
+  bossShootTimer+=elapsed;
+  playerShootTimer+=elapsed;
+
+  if(bossShootTimer>1.25){
+   fireBossShot();
+   bossShootTimer=0;
+  }
+
+  // Dein Monster schießt automatisch auf den Boss!
+  if(playerShootTimer>.32){
+   firePlayerShot();
+   playerShootTimer=0;
+  }
+ }
+
+ // Normale Gegner aktualisieren
+ for(let i=enemies.length-1;i>=0;i--){
+  let e=enemies[i];
+  e.y+=speed*dt;
+  e.el.style.top=e.y+"px";
+
+  if(collision(e.el,monster)){
+   if(e.type==="enemy"||e.type==="laser"){
+    e.el.remove();enemies.splice(i,1);
+    loseLife();
+    if(!active)return;
+    continue;
+   }
+   if(e.type==="crystal"){
+    score+=50;
+    e.el.remove();enemies.splice(i,1);
+    continue;
+   }
+  }
+
+  if(e.y>game.clientHeight+30){
+   if(e.type==="enemy")score+=10;
+   e.el.remove();enemies.splice(i,1);
+  }
+ }
+
+ // Deine Schüsse treffen den Boss
+ for(let i=playerShots.length-1;i>=0;i--){
+  let s=playerShots[i];
+  s.y-=9*dt;
+  s.el.style.top=s.y+"px";
+
+  if(bossActive&&collision(s.el,boss)){
+   s.el.remove();
+   playerShots.splice(i,1);
+   damageBoss();
+   continue;
+  }
+
+  if(s.y< -30){
+   s.el.remove();
+   playerShots.splice(i,1);
+  }
+ }
+
+ // Boss-Schüsse treffen dich
+ for(let i=bossShots.length-1;i>=0;i--){
+  let s=bossShots[i];
+  s.y+=(4+speed*.25)*dt;
+  s.el.style.top=s.y+"px";
+
+  if(collision(s.el,monster)){
+   s.el.remove();
+   bossShots.splice(i,1);
+   loseLife();
+   if(!active)return;
+   continue;
+  }
+
+  if(s.y>game.clientHeight+20){
+   s.el.remove();
+   bossShots.splice(i,1);
+  }
+ }
+
+ score+=Math.floor(dt);
+ document.getElementById("score").textContent=score;
+
+ animation=requestAnimationFrame(loop);
+}
+
+function backToMenu(){
+ active=false;
+ cancelAnimationFrame(animation);
+ clearObjects();
+ boss.style.display="none";
+ document.getElementById("bossBar").style.display="none";
+ game.style.display="none";
+ game.style.borderColor="cyan";
+ document.getElementById("menu").style.display="block";
+ document.getElementById("stats").style.display="none";
+ document.getElementById("back").style.display="none";
+ document.getElementById("message").textContent="";
+}
+
+game.addEventListener("pointerdown",e=>{
+ let r=game.getBoundingClientRect();
+ x=e.clientX<r.left+r.width/2?
+ Math.max(4,x-12):Math.min(96,x+12);
+ monster.style.left=x+"%";
+});
+</script>
+</body>
+</html>
